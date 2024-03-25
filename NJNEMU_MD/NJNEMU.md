@@ -1304,15 +1304,123 @@ static int decode_exec(Decode *s) {
 }
 ```
 
+下面来看看`INSTPAT`宏定义：
 
+```C
+// --- pattern matching wrappers for decode ---
+#define INSTPAT(pattern, ...) do { \
+  uint64_t key, mask, shift; \
+  pattern_decode(pattern, STRLEN(pattern), &key, &mask, &shift); \
+  if ((((uint64_t)INSTPAT_INST(s) >> shift) & mask) == key) { \
+    INSTPAT_MATCH(s, ##__VA_ARGS__); \
+    goto *(__instpat_end); \
+  } \
+} while (0)
+```
 
+将上述代码展开：
 
+```C
+{ const void ** __instpat_end = &&__instpat_end_;
+do {
+  uint64_t key, mask, shift;
+  pattern_decode("??????? ????? ????? ??? ????? 00101 11", 38, &key, &mask, &shift);
+  if ((((uint64_t)s->isa.inst.val >> shift) & mask) == key) {
+    {
+      decode_operand(s, &rd, &src1, &src2, &imm, TYPE_U);
+      R(rd) = s->pc + imm;
+    }
+    goto *(__instpat_end);
+  }
+} while (0);
+// ...
+__instpat_end_: ; }
+```
 
+NEMU取指令的时候会把指令记录到`s->isa.inst.val`
 
+`pattern_decode()` 译码指令的具体操作
+
+`decode_operand()`译码指令的操作对象，根据传入的指令类型`type`来进行操作数的译码, 译码结果将记录到函数参数`rd`, `src1`, `src2`和`imm`中, 它们分别代表目的操作数的寄存器号码, 两个源操作数和立即数.
+
+##  运行时环境与AM
+
+AM(Abstract machine)项目就是这样诞生的. 作为一个向程序提供运行时环境的库, AM根据程序的需求把库划分成以下模块
 
 ```
-apt-get install g++-riscv32-linux-gnu binutils-riscv32-linux-gnu
+AM = TRM + IOE + CTE + VME + MPE
 ```
+
+- TRM(Turing Machine) - 图灵机, 最简单的运行时环境, 为程序提供基本的计算能力
+- IOE(I/O Extension) - 输入输出扩展, 为程序提供输出输入的能力
+- CTE(Context Extension) - 上下文扩展, 为程序提供上下文管理的能力
+- VME(Virtual Memory Extension) - 虚存扩展, 为程序提供虚存管理的能力
+- MPE(Multi-Processor Extension) - 多处理器扩展, 为程序提供多处理器通信的能力 (MPE超出了ICS课程的范围, 在PA中不会涉及)
+
+```
+(在NEMU中)实现硬件功能 -> (在AM中)提供运行时环境 -> (在APP层)运行程序
+(在NEMU中)实现更强大的硬件功能 -> (在AM中)提供更丰富的运行时环境 -> (在APP层)运行更复杂的程序
+```
+
+自搭建NEMU(硬件)和AM(软件)之间的桥梁来支撑程序的运行, 是"理解程序如何在计算机上运行"这一终极目标的不二选择.
+
+## 输入输出
+
+计算机刚启动时执行的BIOS程序的全称是Basic Input/Output System,
+
+在程序看来, 访问设备 = 读出数据 + 写入数据 + 控制状态.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2063,7 +2171,16 @@ CPU内部操作速度很快，但访问内存速度却慢很多。 每条指令�
   此外，还有一种matching方式，会推送所有有对应的远程分支的本地分支。
   Git 2.0版本之前，默认采用matching方法，现在改为默认采用simple方式。
 
+## 操作数与立即数
 
+在计算机体系结构和指令集中，操作数和立即数是两个不同的概念：
+
+- 操作数（Operand）是指一个指令或操作需要的输入数据，它可以是寄存器中的值、内存中的数据或者其他指令中传递过来的数据。在指令执行时，操作数会被指令使用；它可以是源操作数（被操作的数据）或目的操作数（存放操作结果的地方）。
+- 立即数（Immediate）是指在指令中直接编码的常数值，它是一种特殊的操作数形式。立即数通常作为指令的一部分，用于指定一些需要立即操作的数值，如位移量、偏移量、常量等等。
+
+在大多数指令集架构中，一个指令包含一个或多个操作数，其中一些可能是立即数。立即数与操作数的不同之处在于立即数是直接编码在指令中的常数值，而操作数可以是寄存器中的值、内存中的数据等等。
+
+总的来说，操作数是指指令执行时使用的输入数据，而立即数是一种特殊的操作数形式，它直接编码在指令中用于表示常数值
 
 
 
