@@ -2,6 +2,7 @@
 
 - 采用Raw_version版本学习
 - 4月3开始
+- “庖丁解牛”共14篇文章，一天两篇完成，然后回来再细看吧
 
 ## 配置`MySQL`
 
@@ -412,6 +413,8 @@ int main(){
 
 # 线程同步机制封装类
 
+多线程同步，确保任一时刻只能有一个线程能进入关键代码段.
+
 ## RAII
 
 RAII全称是“Resource Acquisition is Initialization”，直译过来是“资源获取即初始化”.
@@ -452,49 +455,241 @@ RAII的核心思想是将资源或者状态与对象的生命周期绑定，通�
 
 
 
+# 半同步半反应堆线程池
+
+使用一个工作队列完全解除了主线程和工作线程的耦合关系：主线程往工作队列中插入任务，工作线程通过竞争来取得任务并执行它。
+
+## 线程池
+
+[C/C++手撕线程池](https://blog.csdn.net/ACMer_L/article/details/107578636)
+
+### 线程池介绍
+
+在计算机体系结构中有许多池式结构：内存池、数据库连接池、请求池、消息队列、对象池等等。
+
+池式结构解决的主要问题为**缓冲问题**，起到的是缓冲区的作用。
+
+#### 线程池的出现
+
+在程序开始运行阶段提前创建好一堆线程，等我们需要用的时候只要去这一堆线程中领一个线程，用完了再放回去，等程序运行结束时统一释放这一堆线程。按照这个想法，线程池出现了。
+
+#### 线程池解决的问题
+
+| 问题                         | 描述                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
+| 解决任务处理                 | 线程池可以接受并处理大量的任务，而不会立即创建大量的线程。它通过将任务放入任务队列中，并由**线程池中的线程逐个获取任务来进行处理**。这样可以控制并发线程的数量，避免系统资源过度消耗。 |
+| 阻塞 I/O                     | 在进行阻塞 I/O 操作时，线程可以被释放并返回线程池中，而不是一直占用着线程资源。这样可以提高系统的并发性能，因为在 I/O 操作等待完成期间，线程可以被用于处理其他任务。 |
+| 解决线程创建与销毁的成本问题 | 创建和销毁线程是一项昂贵的操作，涉及到内存分配、上下文切换等开销。通过使用线程池，可以预先创建一定数量的线程，并在需要时重复使用它们，避免频繁的线程创建和销毁，从而降低系统开销。 |
+| 管理线程                     | 线程池可以监控和管理线程的状态、数量和执行情况。它可以动态地调整线程的数量，根据系统负载情况进行扩缩容，确保线程池中的线程数量能够适应当前的工作负载。同时，线程池还可以提供线程的复用和回收机制，确保线程的高效利用。 |
+
+**线程池应用之一：日志存储**
+
+在服务器保存日志至磁盘上时，性能往往压在磁盘读写上，而引入线程池利用**异步解耦**可以解决磁盘读写性能问题。
+
+**线程池的主要作用：异步解耦**
+
+### 线程池中比较关键的东西
+
+若想自己编写一个线程池框架，那么可以先关注线程池中比较关键的东西：
+
+- 工作队列
+- 任务队列
+- 线程池的池
+- `pthread_create`中的回调函数
+
+![线程池](watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0FDTWVyX0w=,size_16,color_FFFFFF,t_70.png)
 
 
 
+最佳线程数目 = （（线程等待时间+线程CPU时间）/线程CPU时间 ）* CPU数目
+
+## 服务器编程基本框架
+
+主要由**I/O单元**，逻辑单元和**网络存储单元**组成，其中每个单元之间**通过请求队列进行通信**，从而协同完成任务。
+
+其中I/O单元用于处理客户端连接，读写网络数据；逻辑单元用于处理业务逻辑的线程；网络存储单元指本地数据库和文件等。
+
+![图片](640.webp)
+
+## 同步I/O模拟proactor模式
+
+由于异步I/O并不成熟，实际中使用较少，这里将使用同步I/O模拟实现proactor模式。
+
+>同步I/O指内核向应用程序通知的是就绪事件，比如只通知有客户端连接，要求用户代码自行执行I/O操作
+>
+>proactor模式中，主线程和内核负责处理读写数据、接受新连接等I/O操作，工作线程仅负责业务逻辑，如处理客户请求。通常由**异步I/O**实现。
+
+## Webserver线程池分析
+
+线程池的设计模式为半同步/半反应堆，其中反应堆具体为Proactor事件处理模式。
+
+具体的，主线程为异步线程，负责监听文件描述符，接收socket新连接，若当前监听的socket发生了读写事件，然后将任务插入到请求队列。工作线程从请求队列中取出任务，完成读写数据的处理。
 
 
 
-多线程同步，确保任一时刻只能有一个线程能进入关键代码段.
+# http连接处理
 
-> - 信号量
-> - 互斥锁
-> - 条件变量
+##  基础知识，http类及请求接收
 
+### epoll
 
+`epoll` 是 Linux 操作系统提供的一种 I/O 复用机制。它是基于事件驱动的模型，用于高效地处理大量的并发 I/O 操作。
 
+`epoll` 的主要作用是监视文件描述符（通常是套接字）上的事件。
 
+使用 `epoll` 需要以下几个步骤：
 
+1. 创建一个 `epoll` 实例，通过调用 `epoll_create` 函数来实现。
+2. 使用 `epoll_ctl` 函数向 `epoll` 实例中注册感兴趣的事件，包括读事件、写事件等。
+3. 使用 `epoll_wait` 函数等待事件的发生，当有事件发生时，该函数将返回相关的文件描述符和事件信息。
+4. 根据返回的文件描述符和事件信息，进行相应的处理操作。
 
+### 源码
 
+#### 创建数据库连接池和线程池
 
+```C++
+   //创建数据库连接池
+    connection_pool *connPool = connection_pool::GetInstance();
+    connPool->init("localhost", "debian-sys-maint", "uX64R3Nm9aK0TEdB", "yourdb", 3306, 8);
 
+    //创建线程池
+    threadpool<http_conn> *pool = NULL;
+    try
+    {
+        pool = new threadpool<http_conn>(connPool);
+    }
+    catch (...)
+    {
+        return 1;
+    }
+```
 
+数据库连接池对象 `connPool` 被作为参数传递给了创建的线程池对象 `pool`。
 
+目的：将数据库连接池与线程池关联起来，使线程池中的线程能够获取数据库连接，并执行相应的任务。
 
+```C++
+http_conn *users = new http_conn[MAX_FD];
+assert(users);
+```
 
+创建了一个 `http_conn` 类型的数组。
 
+`#define MAX_FD 65536 //最大文件描述符`，文件描述符是对文件、套接字和其他I/O资源的引用。它是一个非负整数，由操作系统分配和管理。
 
+`assert(users)` 是一个断言语句。如果users为真，则程序继续执行；为假，则程序会终止并输出相应的错误信息。
 
+#### 初始化数据库读取表
 
+```C++
+//初始化数据库读取表
+users->initmysql_result(connPool);
+```
 
+`initmysql_result`用于初始化 MySQL 连接并从数据库中检索用户名和密码数据。
 
+```C++
 
+void http_conn::initmysql_result(connection_pool *connPool)
+{
+    //先从连接池中取一个连接
+    MYSQL *mysql = NULL;
+    connectionRAII mysqlcon(&mysql, connPool);
 
+    //在user表中检索username，passwd数据，浏览器端输入
+    if (mysql_query(mysql, "SELECT username,passwd FROM user"))
+    {
+        LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
+    }
 
+    //从表中检索完整的结果集
+    MYSQL_RES *result = mysql_store_result(mysql);
 
+    //返回结果集中的列数
+    int num_fields = mysql_num_fields(result);
 
+    //返回所有字段结构的数组
+    MYSQL_FIELD *fields = mysql_fetch_fields(result);
 
+    //从结果集中获取下一行，将对应的用户名和密码，存入map中
+    while (MYSQL_ROW row = mysql_fetch_row(result))
+    {
+        string temp1(row[0]);
+        string temp2(row[1]);
+        users[temp1] = temp2;
+    }
+}
+```
 
+`connectionRAII mysqlcon(&mysql, connPool);`  ，从连接池`connPool`中获取数据库连接，并将连接赋值给变量mysql。
 
+`mysql_query` ，向 `mysql` 数据库发送 SQL 查询语句，从名为 `user`的表中获取 `username`和 `passwd`列的数据
 
+`mysql_store_result`，将查询的结果集存储在`MYSQL_RES`类型的结果对象中
 
+#### 创建监听套接字
 
+```C++
+int listenfd = socket(PF_INET, SOCK_STREAM, 0);
+assert(listenfd >= 0);
 
+int ret = 0;
+struct sockaddr_in address;
+bzero(&address, sizeof(address));
+address.sin_family = AF_INET;
+address.sin_addr.s_addr = htonl(INADDR_ANY);
+address.sin_port = htons(port);
 
+int flag = 1;
+setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
+
+ret = bind(listenfd, (struct sockaddr *)&address, sizeof(address));
+assert(ret >= 0);
+ret = listen(listenfd, 5);
+assert(ret >= 0);
+```
+
+1. 创建一个 TCP 套接字。
+2. 将套接字绑定到指定的 IP 地址和端口。
+3. 进入监听状态，等待客户端连接。
+4. ~~接受客户端连接，并创建一个新的套接字来处理该连接。~~
+5. ~~向客户端发送数据。~~
+6. ~~关闭客户端套接字和服务器套接字。~~
+
+`SO_REUSEADDR`：允许重复使用端口。套接字选项允许在先前被另一个套接字绑定的端口上绑定新的套接字。这对于避免端口耗尽问题很有用
+
+#### 创建内核事件表
+
+```C++
+//创建内核事件表
+    epoll_event events[MAX_EVENT_NUMBER];
+    epollfd = epoll_create(5);
+    assert(epollfd != -1);
+
+    addfd(epollfd, listenfd, false);
+    http_conn::m_epollfd = epollfd;
+```
+
+`events`，`epoll` 事件数组，用于存储 `epoll_wait()` 检测到的就绪事件
+
+`epoll_create(5)` 是一个系统调用，用于创建一个 epoll 实例，并返回一个指向该实例的文件描述符。这个文件描述符将被用于所有后续的 epoll 系统调用（如 `epoll_ctl`，`epoll_wait` 等）。`epollfd`是一个静态全局变量，在前面有定义。
+
+`addfd`，将监听套接字`listenfd`添加到`epoll`实例，为了让`epoll`实例能够监视和管理它
+
+`http_conn::m_epollfd = epollfd;`，所有的 `http_conn` 实例都将使用同一个 `epoll` 实例来进行 I/O 多路复用，所有的 `HTTP` 连接都可以被同一个 `epoll` 实例管理，这样可以更有效地处理并发连接。
+
+"创建内核事件表"的过程主要涉及到以下几个步骤：
+
+1. `epoll_event events[MAX_EVENT_NUMBER];`：创建一个 `epoll_event` 数组，用于存储 `epoll_wait()` 检测到的就绪事件。`MAX_EVENT_NUMBER` 是数组的大小，也就是最多可以处理的事件数量。
+
+2. `epollfd = epoll_create(5);`：调用 `epoll_create()` 函数创建一个 epoll 实例。这个函数返回一个文件描述符，代表了这个 epoll 实例。这个文件描述符将被用于所有后续的 epoll 系统调用。
+
+3. `addfd(epollfd, listenfd, false);`：调用 `addfd()` 函数将监听套接字 `listenfd` 添加到 epoll 实例。这样，当 `listenfd` 上有新的连接请求时，epoll 就能检测到。
+
+4. `http_conn::m_epollfd = epollfd;`：将 epoll 文件描述符赋值给 `http_conn` 类的静态成员变量 `m_epollfd`。这样，所有的 `http_conn` 对象都可以使用这个 epoll 实例。
+
+"内核事件表"的作用是让你的程序能够**同时监视多个文件描述符**。当任何一个文件描述符就绪（例如，有新的连接请求，或者有数据可读），epoll 就会通知你的程序。这种机制被称为 I/O 多路复用，它可以让你的程序高效地处理大量的并发连接。
 
 
 
@@ -578,9 +773,63 @@ RAII的核心思想是将资源或者状态与对象的生命周期绑定，通�
 
 ## 统计代码行数
 
-
-
 ```shell
 find  *.c | xargs wc -l | sort -n
 ```
 
+## 静态成员变量和函数
+
+### 静态成员变量
+
+将类成员变量声明为static，则为静态成员变量，与一般的成员变量不同，**无论建立多少对象，都只有一个静态成员变量的拷贝，静态成员变量属于一个类，所有对象共享**。
+
+静态变量在编译阶段就分配了空间，对象还没创建时就已经分配了空间，放到全局静态区。
+
+- 静态成员变量
+
+- - 最好是类内声明，类外初始化（以免类名访问静态成员访问不到）。
+  - 无论公有，私有，静态成员都可以在类外定义，但私有成员仍有访问权限。
+  - 非静态成员类外不能初始化。
+  - 静态成员数据是共享的。
+
+
+### 静态成员函数
+
+将类成员函数声明为static，则为静态成员函数。
+
+- 静态成员函数
+
+- - 静态成员函数可以直接访问静态成员变量，不能直接访问普通成员变量，但可以通过参数传递的方式访问。
+  - 普通成员函数可以访问普通成员变量，也可以访问静态成员变量。
+  - 静态成员函数没有this指针。非静态数据成员为对象单独维护，但静态成员函数为共享函数，无法区分是哪个对象，因此不能直接访问普通变量成员，也没有this指针。
+
+要访问静态成员函数，可以使用类名和作用域解析运算符`::`来调用该函数。不需要创建类的实例，可以直接通过类名来调用静态成员函数。
+
+```c++
+class MyClass {
+public:
+    static void staticFunction();
+};
+
+int main() {
+    MyClass::staticFunction();  // 调用静态成员函数
+    return 0;
+}
+```
+
+## C++中try catch语句
+
+```C++
+try{
+...
+}
+catch{
+...
+
+```
+
+`try`语句块是用来判断是否有异常；
+
+`catch`语句块捕捉异常，并进行处理；
+
+`throw`是抛出异常；
