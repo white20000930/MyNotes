@@ -544,9 +544,9 @@ RAII的核心思想是将资源或者状态与对象的生命周期绑定，通�
 3. 使用 `epoll_wait` 函数等待事件的发生，当有事件发生时，该函数将返回相关的文件描述符和事件信息。
 4. 根据返回的文件描述符和事件信息，进行相应的处理操作。
 
-### 源码
+# main函数源码
 
-#### 创建数据库连接池和线程池
+## 创建数据库连接池和线程池
 
 ```C++
    //创建数据库连接池
@@ -580,7 +580,9 @@ assert(users);
 
 `assert(users)` 是一个断言语句。如果users为真，则程序继续执行；为假，则程序会终止并输出相应的错误信息。
 
-#### 初始化数据库读取表
+**这种架构允许线程池和数据库连接池独立管理。线程池负责处理 HTTP 请求，而数据库连接池负责管理数据库连接。当线程池需要一个数据库连接时，它可以从连接池中获取一个连接，而无需担心连接池的内部工作原理。**
+
+## 初始化数据库读取表
 
 ```C++
 //初始化数据库读取表
@@ -628,7 +630,7 @@ void http_conn::initmysql_result(connection_pool *connPool)
 
 `mysql_store_result`，将查询的结果集存储在`MYSQL_RES`类型的结果对象中
 
-#### 创建监听套接字
+## 创建监听套接字
 
 ```C++
 int listenfd = socket(PF_INET, SOCK_STREAM, 0);
@@ -659,7 +661,7 @@ assert(ret >= 0);
 
 `SO_REUSEADDR`：允许重复使用端口。套接字选项允许在先前被另一个套接字绑定的端口上绑定新的套接字。这对于避免端口耗尽问题很有用
 
-#### 创建内核事件表
+## 创建内核事件表
 
 ```C++
 //创建内核事件表
@@ -673,7 +675,7 @@ assert(ret >= 0);
 
 `events`，`epoll` 事件数组，用于存储 `epoll_wait()` 检测到的就绪事件
 
-`epoll_create(5)` 是一个系统调用，用于创建一个 epoll 实例，并返回一个指向该实例的文件描述符。这个文件描述符将被用于所有后续的 epoll 系统调用（如 `epoll_ctl`，`epoll_wait` 等）。`epollfd`是一个静态全局变量，在前面有定义。
+`epoll_create(5)` 是一个系统调用，用于创建一个 epoll 实例，并返回一个指向该实例的文件描述符。这个文件描述符将被用于所有后续的 epoll 系统调用（如 `epoll_ctl`，`epoll_wait` 等）。**`epollfd`是一个静态全局变量，在前面有定义。**
 
 `addfd`，将监听套接字`listenfd`添加到`epoll`实例，为了让`epoll`实例能够监视和管理它
 
@@ -690,6 +692,164 @@ assert(ret >= 0);
 4. `http_conn::m_epollfd = epollfd;`：将 epoll 文件描述符赋值给 `http_conn` 类的静态成员变量 `m_epollfd`。这样，所有的 `http_conn` 对象都可以使用这个 epoll 实例。
 
 "内核事件表"的作用是让你的程序能够**同时监视多个文件描述符**。当任何一个文件描述符就绪（例如，有新的连接请求，或者有数据可读），epoll 就会通知你的程序。这种机制被称为 I/O 多路复用，它可以让你的程序高效地处理大量的并发连接。
+
+## 创建管道
+
+```C++
+ //创建管道
+    ret = socketpair(PF_UNIX, SOCK_STREAM, 0, pipefd);
+    assert(ret != -1);
+    setnonblocking(pipefd[1]);
+    addfd(epollfd, pipefd[0], false);
+```
+
+`socketpair()`函数创建的一对无名的UNIX套接字，`pipefd[0]`和`pipefd[1]`，他们作用是实现进程间的通信，`pipefd[0]`通常用于读取数据，`pipefd[1]`通常用于写入数据。
+
+`setnonblocking()`，将`pipefd[1]`设置为非阻塞模式，对它写入操作不会阻塞。
+
+`addfd()`，将`pipefd[0]`添加到`epollfd`指示的`epoll`事件监听集合中，当`pipefd[0]`上有数据可读时，`epoll`会通知应用程序。
+
+## 设置信号处理函数
+
+```C++
+    addsig(SIGALRM, sig_handler, false);
+    addsig(SIGTERM, sig_handler, false);
+    bool stop_server = false;
+
+    client_data *users_timer = new client_data[MAX_FD];
+
+    bool timeout = false;
+    alarm(TIMESLOT);
+```
+
+`addsig`，将`SIGALRM`信号和`SIGTERM`信号的处理函数设置为`sig_handler`。`false`参数表示在处理信号时不阻塞其他信号。
+
+`SIGALRM`是一个定时器信号，当定时器到期时，系统会发送这个信号。
+
+`SIGTERM`是一个终止信号，通常用于请求进程正常退出。
+
+`addsig`和`sig_handler`函数前面有定义，先不看了。
+
+`users_timer`，用于存储客户端数据。
+
+`alarm(TIMESLOT)`，设置一个定时器。`TIMESLOT`是定时器的时间。当定时器到期时，系统会发送一个`SIGALRM`信号。
+
+## 服务器接收http请求
+
+浏览器端发出http连接请求，主线程创建http对象接收请求并将所有数据读入对应`buffer`，将该对象插入任务队列，工作线程从任务队列中取出一个任务进行处理。
+
+> **代码总结：**
+>
+> 这段代码是多线程高并发 Web 服务器的主循环，用于处理客户端请求和定时任务。它使用 epoll 来高效地监视事件。
+>
+> **关键步骤：**
+>
+> 1. **主循环：**
+>     - 在主循环中，使用 `epoll_wait` 等待事件的发生。
+>     - 处理所有就绪事件：
+>         - 如果就绪事件是 `listenfd`，则表示有新的客户端连接。
+>             - **LT（监听触发）：**接受一个连接并将其添加到用户数组 `users` 中。
+>             - **ET（边缘触发）：**循环接收所有待处理的连接，并将其添加到 `users` 数组中。
+>         - 如果就绪事件是客户端连接，则表示有数据可读或可写。
+>             - 将该连接添加到请求队列中。
+>             - 或者，处理从客户端发送的数据。
+>         - 处理其他事件，例如异常事件、信号等。
+>         - 处理超时定时器事件（使用定时器列表 `timer_lst`）。
+>
+> 2. **信号处理：**
+>     - 处理 `SIGALRM` 信号，表示超时已发生。
+>     - 处理 `SIGTERM` 信号，表示服务器应该停止。
+>
+> 3. **资源释放：**
+>     - 在循环结束后，关闭文件描述符、释放内存并删除定时器。
+>
+> **其他注意事项：**
+>
+> - `users` 数组用于存储每个客户端连接的信息，包括套接字文件描述符、客户端地址等。
+> - `users_timer` 数组用于存储每个客户端连接的定时器信息。
+> - `pool` 是一个线程池，用于处理客户请求。
+> - `timer_lst` 是一个定时器列表，用于管理超时定时器。
+> - `show_error` 函数向客户端发送错误消息。
+>
+> **作用：**
+>
+> 这段代码实现了多线程高并发 Web 服务器的核心逻辑。它通过使用 epoll 和定时器列表来高效地处理大量客户端连接和定时任务。
+
+### 主循环
+
+```C++
+    while (!stop_server)
+    {
+        int number = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
+        if (number < 0 && errno != EINTR)
+        {
+            LOG_ERROR("%s", "epoll failure");
+            break;
+        }
+
+        for (int i = 0; i < number; i++)
+        {
+        }
+```
+
+`epoll_wait()` 函数监视由 `epollfd` 指定的 epoll 实例中的文件描述符，直到它们准备好进行某些操作，返回就绪文件描述符的数量。
+
+### `for`循环中处理所有就绪事件
+
+```C++
+for (int i = 0; i < number; i++){
+	int sockfd = events[i].data.fd;
+    if (sockfd == listenfd){   
+    ...  // 如果是监听套接字，则处理新到的客户连接
+    }else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)){
+    ...  // 如果是错误事件（挂断、连接中断或其他错误）
+    }else if ((sockfd == pipefd[0]) && (events[i].events & EPOLLIN)){
+    ...  // 如果是从管道中读取数据
+    }else if (events[i].events & EPOLLIN){
+    ...  // 如果是可以读取数据  
+    }else if (events[i].events & EPOLLOUT){
+    ...  // 如果可以写入数据 
+    }
+    ...
+}
+```
+
+为什么是监听套接字就要处理新的客户端连接？
+
+**监听套接字**用于侦听来自客户端的传入连接请求。当客户端尝试连接到服务器时，监听套接字会接收连接请求并创建一个新的**已连接套接字**来处理该连接。
+
+`sockfd` 等于 `listenfd`，则表示服务器已收到一个新的客户端连接请求。
+
+
+
+
+
+# 文件之间的关系
+
+```shell
+TinyWebServer
+├── main.c   
+├── CGImysql  #包含与 MySQL 数据库交互的代码
+├── http  #包含处理 HTTP 请求和响应的代码
+├── lock  #线程同步锁的代码
+├── threadpool  #线程池
+├── timer  #定时器
+├── ...
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -725,7 +885,35 @@ assert(ret >= 0);
 
 
 
-#
+## 文件描述符与套接字（socket）关系
+
+### 套接字 socket 
+
+代表一个通信双方的 link:
+
+网络中运行的两个程序，他们建立起了一个能够使双方互相通信的链接，一个socket就是这个链接的一个末端。一个socket绑定一个端口，这样使得TCP传输层能够知道数据传送的目的地。
+
+一个TCP连接的套接字对（socket pair）是一个定义该连接的两个端点的四元组：本地IP地址、本地TCP端口、外地地址、外地TCP端口。套接字对唯一标识一个网络上的每个TCP连接。
+
+标识每个端口的两个值（IP地址和端口号）通常称为一个套接字。
+
+### 文件描述符 File Descriptor
+
+是操作系统内核为了高效管理已被打开的文件所创建的索引，用于指代被打开的文件
+
+在linux操作系统中，**每一个进程中都有一个文件描述符表**，它是一个指针数组，系统默认初始化了数组的前3位。第0位指向标准的输入流（一般是键盘），第1位指向标准的输出流（一般是显示器），第2位指向标准的错误流（一般是也显示器）。
+
+现在如果有一个进程中只打开了一个 hello.txt 文件,那么这个进程的文件描述符表的第3位就是指向这个 hello.txt 的指针。之后如果该进程创建了一个socket，那么这个文件描述符表的第4位就是指向这个socket的指针，**因为在linux中一切皆文件，socket也是一个文件**。我们所说的文件描述符就是进程中这个数组的下标，因此他也可以说是一个索引。
+
+### 服务器建立连接的过程
+
+首先服务器（server）上有一个socket绑定了80端口（80端口是为HTTP超文本传输协议开放的端口），服务器会一直等待，直到有客户端（client）向服务端发送了连接请求
+
+client会把自己的ip和端口信息告诉server，这样server就会在本地开启一个与client同端口号的端口，并创建一个新的socket，保证80端口的socket能够继续监听其他的连接
+
+这样一对socket就建立完成了，客户端与服务端就能通过socket进行数据的发送和读取了。
+
+
 
 
 
@@ -833,3 +1021,6 @@ catch{
 `catch`语句块捕捉异常，并进行处理；
 
 `throw`是抛出异常；
+
+
+
