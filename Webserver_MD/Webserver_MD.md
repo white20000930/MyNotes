@@ -976,3 +976,57 @@ Ubuntu: Ctrl + Alt + '-'
 
 Mac: control + '-'
 
+## POSIX
+
+ 可移植操作系统接口 Portable Operating System Interface
+
+它是一个 IEEE 1003.1 标准，其定义了应用程序（以及命令行 Shell 和实用程序接口）和 UNIX 操作系统之间的语言接口。
+
+POSIX 涵盖了以下内容：系统接口、命令和实用程序、网络文件访问，以及很多其他内容
+
+## HTTP 报文
+
+**行**
+
+HTTP 请求由文本行组成。每一行都包含一个字段名称和一个字段值，用冒号分隔。例如：
+
+```
+GET /index.html HTTP/1.1
+```
+
+这是请求行，它指定请求方法（GET）、请求 URI（/index.html）和 HTTP 版本（HTTP/1.1）。
+
+**头**
+
+HTTP 头部也是由文本行组成的，但它们包含有关请求的附加信息。例如：
+
+```
+Host: www.example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.125 Safari/537.36
+```
+
+这些头部指定了请求的主机名（www.example.com）和客户端正在使用的用户代理（Mozilla/5.0 ...）。
+
+**内容**
+
+HTTP 请求内容是请求正文。它通常包含用户提交的数据或要上传的文件。例如，如果用户正在提交表单，表单数据将包含在请求内容中。
+
+**示例**
+
+以下是一个完整的 HTTP 请求示例，其中包含行、头和内容：
+
+```
+GET /index.html HTTP/1.1
+Host: www.example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.125 Safari/537.36
+
+Hello world!
+```
+
+请求行是第一行，它指定请求方法（GET）、请求 URI（/index.html）和 HTTP 版本（HTTP/1.1）。
+
+请求头是第二和第三行，它们指定了请求的主机名（www.example.com）和客户端正在使用的用户代理（Mozilla/5.0 ...）。
+
+请求内容是最后一行，它包含用户提交的数据（"Hello world!"）。
+
+HTTP 服务器或客户端库使用行、头和内容来解析和处理 HTTP 请求。
