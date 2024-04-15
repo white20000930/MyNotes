@@ -473,15 +473,6 @@ RAII的核心思想是将资源或者状态与对象的生命周期绑定，通�
 
 在程序开始运行阶段提前创建好一堆线程，等我们需要用的时候只要去这一堆线程中领一个线程，用完了再放回去，等程序运行结束时统一释放这一堆线程。按照这个想法，线程池出现了。
 
-#### 线程池解决的问题
-
-| 问题                         | 描述                                                         |
-| ---------------------------- | ------------------------------------------------------------ |
-| 解决任务处理                 | 线程池可以接受并处理大量的任务，而不会立即创建大量的线程。它通过将任务放入任务队列中，并由**线程池中的线程逐个获取任务来进行处理**。这样可以控制并发线程的数量，避免系统资源过度消耗。 |
-| 阻塞 I/O                     | 在进行阻塞 I/O 操作时，线程可以被释放并返回线程池中，而不是一直占用着线程资源。这样可以提高系统的并发性能，因为在 I/O 操作等待完成期间，线程可以被用于处理其他任务。 |
-| 解决线程创建与销毁的成本问题 | 创建和销毁线程是一项昂贵的操作，涉及到内存分配、上下文切换等开销。通过使用线程池，可以预先创建一定数量的线程，并在需要时重复使用它们，避免频繁的线程创建和销毁，从而降低系统开销。 |
-| 管理线程                     | 线程池可以监控和管理线程的状态、数量和执行情况。它可以动态地调整线程的数量，根据系统负载情况进行扩缩容，确保线程池中的线程数量能够适应当前的工作负载。同时，线程池还可以提供线程的复用和回收机制，确保线程的高效利用。 |
-
 **线程池应用之一：日志存储**
 
 在服务器保存日志至磁盘上时，性能往往压在磁盘读写上，而引入线程池利用**异步解耦**可以解决磁盘读写性能问题。
@@ -887,7 +878,7 @@ TinyWebServer
 ## 统计代码行数
 
 ```shell
-find  *.c | xargs wc -l | sort -n
+find . -name '*.c' -o -name '*.cpp' -o -name '*.h' | xargs wc -l | sort -n
 ```
 
 ## 静态成员变量和函数
@@ -986,41 +977,92 @@ POSIX 涵盖了以下内容：系统接口、命令和实用程序、网络文�
 
 ## HTTP 报文
 
-**行**
+### 报文组成
 
-HTTP 请求由文本行组成。每一行都包含一个字段名称和一个字段值，用冒号分隔。例如：
+请求报文
 
 ```
-GET /index.html HTTP/1.1
+请求行
+头部字段
+空行
+消息体（可选）
 ```
 
-这是请求行，它指定请求方法（GET）、请求 URI（/index.html）和 HTTP 版本（HTTP/1.1）。
+![img](v2-bebb45af72e000e648dd6c4aa93b6cd6_720w.jpg)
 
-**头**
+响应报文
+
+```
+状态行
+头部字段
+空行
+消息体（可选）
+```
+
+![img](v2-d85c560e05fe104caccdeec4b46dbfaa_r.jpg)
+
+### 请求行
+
+格式
+
+```
+<请求方法> <请求 URI> <HTTP 版本>
+```
+
+制表符（Tab）通常用作分隔符，将请求方法、请求 URI 和 HTTP 版本分隔开。
+
+```
+POST /api/v1/users HTTP/1.1
+```
+
+这是请求行，它指定请求方法（POST）、请求 URI（/api/v1/users）和 HTTP 版本（HTTP/1.1）。
+
+`GET` 方法：客户端要从服务器中读取某个资源
+
+`POST` 方法：客户端给服务器提供信息较多时
+
+### 请求头
+
+格式
+
+```
+字段名: 字段值
+```
 
 HTTP 头部也是由文本行组成的，但它们包含有关请求的附加信息。例如：
 
 ```
-Host: www.example.com
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.125 Safari/537.36
+Host: example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36
+Content-Type: application/json
+Content-Length: 27
 ```
 
-这些头部指定了请求的主机名（www.example.com）和客户端正在使用的用户代理（Mozilla/5.0 ...）。
+`Host`：请求或响应的主机名或 IP 地址。
 
-**内容**
+`User-Agent`：发送请求的客户端软件的信息。
+
+......还有其他字段名。
+
+### 请求内容
 
 HTTP 请求内容是请求正文。它通常包含用户提交的数据或要上传的文件。例如，如果用户正在提交表单，表单数据将包含在请求内容中。
 
-**示例**
+### 示例
 
 以下是一个完整的 HTTP 请求示例，其中包含行、头和内容：
 
 ```
-GET /index.html HTTP/1.1
-Host: www.example.com
-User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.5359.125 Safari/537.36
+POST /api/v1/users HTTP/1.1
+Host: example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36
+Content-Type: application/json
+Content-Length: 27
 
-Hello world!
+{
+  "username": "alice",
+  "password": "secret"
+}
 ```
 
 请求行是第一行，它指定请求方法（GET）、请求 URI（/index.html）和 HTTP 版本（HTTP/1.1）。
@@ -1030,3 +1072,100 @@ Hello world!
 请求内容是最后一行，它包含用户提交的数据（"Hello world!"）。
 
 HTTP 服务器或客户端库使用行、头和内容来解析和处理 HTTP 请求。
+
+### HTTP报文格式
+
+在HTTP报文中，每一行的数据由`\r\n`作为结束字符，空行则是仅仅是字符\r\n
+
+因此可以通过查找\r\n将报文拆解成单独的行进行解析。
+
+`\r`：回车；`\n`：换行；`\t`：制表符
+
+## 可变参数
+
+**函数可变参数**允许函数接受数量不定的参数。在 C 语言中，可变参数使用 **va_list** 类型和 **va_start()**、**va_arg()** 和 **va_end()** 宏来实现。
+
+**使用函数可变参数的步骤：**
+
+1. **声明可变参数列表：**在函数原型中使用 **...**（省略号）表示函数具有可变参数列表。例如：
+
+```c
+int sum(int num_args, ...);
+```
+
+2. **初始化可变参数列表：**在函数体中，使用 **va_start()** 宏初始化一个 **va_list** 类型的变量，并指定可变参数列表中第一个参数的位置。例如：
+
+```c
+void sum(int num_args, ...) {
+    va_list args;
+    va_start(args, num_args);
+}
+```
+
+3. **访问可变参数列表：**使用 **va_arg()** 宏访问可变参数列表中的参数。**va_arg()** 的第一个参数是 **va_list** 类型的变量，第二个参数是参数的类型。例如：
+
+```c
+int sum(int num_args, ...) {
+    va_list args;
+    va_start(args, num_args);
+
+    int sum = 0;
+    for (int i = 0; i < num_args; i++) {
+        sum += va_arg(args, int);
+    }
+
+    va_end(args);
+    return sum;
+}
+```
+
+4. **清理可变参数列表：**在函数结束时，使用 **va_end()** 宏清理 **va_list** 变量。例如：
+
+```c
+int sum(int num_args, ...) {
+    va_list args;
+    va_start(args, num_args);
+
+    // ...
+
+    va_end(args);
+    return sum;
+}
+```
+
+**示例：**
+
+以下是一个使用可变参数的求和函数的示例：
+
+```c
+#include <stdarg.h>
+
+int sum(int num_args, ...) {
+    va_list args;
+    va_start(args, num_args);
+
+    int sum = 0;
+    for (int i = 0; i < num_args; i++) {
+        sum += va_arg(args, int);
+    }
+
+    va_end(args);
+    return sum;
+}
+
+int main() {
+    int result = sum(3, 1, 2, 3); // 求和 1 + 2 + 3
+    printf("Result: %d\
+", result);
+
+    return 0;
+}
+```
+
+在这个示例中，**sum** 函数使用可变参数列表求和一个不定数量的整数。它使用 **va_start()**、**va_arg()** 和 **va_end()** 宏来访问和清理可变参数列表。
+
+**注意事项：**
+
+* 函数可变参数不是类型安全的。这意味着编译器无法检查可变参数列表中参数的类型是否正确。
+* 函数可变参数可能会导致代码难以维护。
+* 在现代 C++ 中，建议使用变长模板来处理可变数量的参数，而不是使用可变参数。
