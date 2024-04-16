@@ -1085,87 +1085,24 @@ HTTP 服务器或客户端库使用行、头和内容来解析和处理 HTTP 请
 
 **函数可变参数**允许函数接受数量不定的参数。在 C 语言中，可变参数使用 **va_list** 类型和 **va_start()**、**va_arg()** 和 **va_end()** 宏来实现。
 
-**使用函数可变参数的步骤：**
 
-1. **声明可变参数列表：**在函数原型中使用 **...**（省略号）表示函数具有可变参数列表。例如：
 
-```c
-int sum(int num_args, ...);
-```
 
-2. **初始化可变参数列表：**在函数体中，使用 **va_start()** 宏初始化一个 **va_list** 类型的变量，并指定可变参数列表中第一个参数的位置。例如：
 
-```c
-void sum(int num_args, ...) {
-    va_list args;
-    va_start(args, num_args);
-}
-```
 
-3. **访问可变参数列表：**使用 **va_arg()** 宏访问可变参数列表中的参数。**va_arg()** 的第一个参数是 **va_list** 类型的变量，第二个参数是参数的类型。例如：
 
-```c
-int sum(int num_args, ...) {
-    va_list args;
-    va_start(args, num_args);
 
-    int sum = 0;
-    for (int i = 0; i < num_args; i++) {
-        sum += va_arg(args, int);
-    }
 
-    va_end(args);
-    return sum;
-}
-```
+## 待学习
 
-4. **清理可变参数列表：**在函数结束时，使用 **va_end()** 宏清理 **va_list** 变量。例如：
+RAII
 
-```c
-int sum(int num_args, ...) {
-    va_list args;
-    va_start(args, num_args);
+IO向量
 
-    // ...
+cgi
 
-    va_end(args);
-    return sum;
-}
-```
 
-**示例：**
 
-以下是一个使用可变参数的求和函数的示例：
 
-```c
-#include <stdarg.h>
 
-int sum(int num_args, ...) {
-    va_list args;
-    va_start(args, num_args);
-
-    int sum = 0;
-    for (int i = 0; i < num_args; i++) {
-        sum += va_arg(args, int);
-    }
-
-    va_end(args);
-    return sum;
-}
-
-int main() {
-    int result = sum(3, 1, 2, 3); // 求和 1 + 2 + 3
-    printf("Result: %d\
-", result);
-
-    return 0;
-}
-```
-
-在这个示例中，**sum** 函数使用可变参数列表求和一个不定数量的整数。它使用 **va_start()**、**va_arg()** 和 **va_end()** 宏来访问和清理可变参数列表。
-
-**注意事项：**
-
-* 函数可变参数不是类型安全的。这意味着编译器无法检查可变参数列表中参数的类型是否正确。
-* 函数可变参数可能会导致代码难以维护。
-* 在现代 C++ 中，建议使用变长模板来处理可变数量的参数，而不是使用可变参数。
+写完了write_log
