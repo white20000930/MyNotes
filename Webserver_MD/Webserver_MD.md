@@ -20,6 +20,8 @@ sudo apt-get install mysql-server
 sudo mysql_secure_installation
 ```
 
+mysql> INSERT INTO user(username, passwd) VALUES('XGWhite', '314159');
+
 具体如何初始化配置，参考：https://zhuanlan.zhihu.com/p/610793026
 
 > 启动server
