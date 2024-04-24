@@ -1105,6 +1105,10 @@ cgi
 
 
 
+MIT6.824
+
+https://mit-public-courses-cn-translatio.gitbook.io/mit6-824
+
 
 
 写完了write_log
