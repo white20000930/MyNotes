@@ -986,32 +986,3 @@ HTTP 服务器或客户端库使用行、头和内容来解析和处理 HTTP 请
 
 `\r`：回车；`\n`：换行；`\t`：制表符
 
-## 可变参数
-
-**函数可变参数**允许函数接受数量不定的参数。在 C 语言中，可变参数使用 **va_list** 类型和 **va_start()**、**va_arg()** 和 **va_end()** 宏来实现。
-
-
-
-
-
-
-
-
-
-## 待学习
-
-RAII
-
-IO向量
-
-cgi
-
-
-
-MIT6.824
-
-https://mit-public-courses-cn-translatio.gitbook.io/mit6-824
-
-
-
-写完了write_log
